@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Catch the Emoji! 🐙😂</title>
+  <style>
+    :root {--bg:#0f111a;--card:#1f2340;--radius:1rem;}
+    *{box-sizing:border-box;}
+    body{margin:0; font-family: system-ui,-apple-system,BlinkMacSystemFont,sans-serif; background:linear-gradient(135deg,#0f111a 0%,#2b315e 80%); color:#f0f8ff; display:flex; min-height:100vh; align-items:center; justify-content:center;}
+    .container{width:100%;max-width:500px;padding:1rem;}
+    .card{background:var(--card); border-radius:var(--radius); padding:1rem; position:relative; overflow:hidden; box-shadow:0 25px 60px -10px rgba(0,0,0,0.5);}
+    h1{margin:0;font-size:1.75rem;text-align:center;}
+    .scoreboard{display:flex;justify-content:space-between;margin:0.75rem 0;font-weight:600;}
+    .play-area{position:relative; height:400px; background:rgba(255,255,255,0.04); border-radius:0.75rem; overflow:hidden;}
+    .emoji{position:absolute; user-select:none; cursor:pointer; font-size:2.25rem; will-change:transform;}
+    .controls{display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:center; margin-top:0.75rem;}
+    button{background:#ffcc33; border:none; padding:0.6rem 1rem; font-weight:700; border-radius:0.75rem; cursor:pointer; flex:1; min-width:100px; transition:filter .2s;}
+    button:hover{filter:brightness(1.1);}
+    .message{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(255,255,255,0.07); padding:1rem 1.25rem; border-radius:1rem; font-size:1rem; display:flex; gap:0.6rem; align-items:center;}
+    .small{font-size:0.8rem; opacity:0.85;}
+    .footer{margin-top:1rem; text-align:center; font-size:0.75rem;}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card" id="gameCard">
+      <h1>Catch the Emoji! 🐙😂</h1>
+      <div class="scoreboard">
+        <div>Score: <span id="score">0</span></div>
+        <div>Time: <span id="timer">30</span>s</div>
+      </div>
+      <div class="play-area" id="playArea" aria-label="Game area where emojis fall. Click them to catch.">        
+      </div>
+      <div class="controls">
+        <button id="startBtn">Start Game</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+      <div class="footer">Simple static game: clone, drop on GitHub Pages, and share the laughs. Click falling emojis before time runs out!</div>
+    </div>
+  </div>
+
+  <template id="emojiTpl">
+    <div class="emoji">😎</div>
+  </template>
+
+  <script>
+    const playArea = document.getElementById('playArea');
+    const scoreEl = document.getElementById('score');
+    const timerEl = document.getElementById('timer');
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let score = 0;
+    let timeLeft = 30; // seconds
+    let gameInterval = null;
+    let spawnInterval = null;
+    let countdownInterval = null;
+    let running = false;
+
+    const emojis = [ '😂','🥳','🤪','😜','😎','🐙','🍕','🌮','🚀','💥' ];
+    const funnyComments = [
+      'You rock! 🤘',
+      'OMG, emoji fever!',
+      'So close... try again!',
+      'Emoji master!',
+      'Too fast? Nah, you got this!',
+      'Whaaat? That was legendary!',
+      'Smile, you caught one!',
+      'Code broke? Blame the octopus! 🐙'
+    ];
+
+    function randomInt(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+
+    function spawnEmoji(){
+      const emojiChar = emojis[randomInt(0, emojis.length-1)];
+      const div = document.createElement('div');
+      div.className = 'emoji';
+      div.textContent = emojiChar;
+      // random horizontal position inside play area
+      const areaRect = playArea.getBoundingClientRect();
+      const size = randomInt(40, 70); // px font-size
+      div.style.fontSize = size + 'px';
+      const maxX = playArea.clientWidth - size;
+      const startX = randomInt(0, Math.max(0, maxX));
+      div.style.left = startX + 'px';
+      div.style.top = '-60px';
+      playArea.appendChild(div);
+      // fall animation using JS
+      const fallDuration = randomInt(4000, 6000); // ms
+      const start = performance.now();
+      function step(now){
+        const progress = (now - start)/fallDuration;
+        if(progress < 1){
+          div.style.transform = `translateY(${progress * (playArea.clientHeight + 80)}px)`;
+          requestAnimationFrame(step);
+        } else {
+          // missed, remove
+          createFloatingMessage('Missed! 😅');
+          div.remove();
+        }
+      }
+      requestAnimationFrame(step);
+      // click handler
+      div.addEventListener('click', (e)=>{
+        if(!running) return;
+        score += 1;
+        scoreEl.textContent = score;
+        createFloatingMessage(funnyComments[randomInt(0, funnyComments.length-1)]);
+        // pop effect
+        div.style.transition = 'transform .2s, opacity .2s';
+        div.style.transform += ' scale(1.4)';
+        div.style.opacity = '0';
+        setTimeout(()=>div.remove(), 200);
+      });
+      // remove after too long (safety)
+      setTimeout(()=>{ if(div.parentElement) div.remove(); }, fallDuration + 500);
+    }
+
+    function createFloatingMessage(text){
+      const msg = document.createElement('div');
+      msg.className = 'message';
+      msg.textContent = text;
+      document.getElementById('gameCard').appendChild(msg);
+      setTimeout(()=>{ msg.style.transition='opacity .6s'; msg.style.opacity='0'; }, 900);
+      setTimeout(()=>msg.remove(), 1600);
+    }
+
+    function startGame(){
+      if(running) return;
+      running = true;
+      score = 0; timeLeft = 30; // reset
+      scoreEl.textContent = score; timerEl.textContent = timeLeft;
+      createFloatingMessage('Go! Catch them all! 🎯');
+      // spawn faster over time
+      spawnEmoji();
+      spawnInterval = setInterval(spawnEmoji, 800);
+      countdownInterval = setInterval(()=>{
+        timeLeft -= 1;
+        timerEl.textContent = timeLeft;
+        if(timeLeft <= 5 && timeLeft>0){
+          // flash timer briefly
+          timerEl.parentElement.animate([{transform:'scale(1)'},{transform:'scale(1.2)'}], {duration:200, iterations:2});
+        }
+        if(timeLeft <= 0){
+          endGame();
+        }
+      }, 1000);
+    }
+
+    function endGame(){
+      running = false;
+      clearInterval(spawnInterval); clearInterval(countdownInterval);
+      createFloatingMessage(`Time's up! Final score: ${score}`);
+      // show final alert after tiny delay
+      setTimeout(()=>{
+        alert('Game Over! Your score: ' + score + '. Share it and make someone laugh!');
+      }, 500);
+    }
+
+    function resetGame(){
+      running = false;
+      clearInterval(spawnInterval); clearInterval(countdownInterval);
+      score = 0; timeLeft = 30;
+      scoreEl.textContent = score; timerEl.textContent = timeLeft;
+      // remove existing emojis
+      document.querySelectorAll('.emoji').forEach(e=>e.remove());
+    }
+
+    startBtn.addEventListener('click', startGame);
+    resetBtn.addEventListener('click', resetGame);
+
+    // keyboard shortcut: space to start
+    window.addEventListener('keydown', e=>{
+      if(e.code==='Space') startGame();
+    });
+
+    // responsive resize: ensure existing emojis stay inside bounds (no heavy logic needed for static)
+  </script>
+</body>
+</html>
